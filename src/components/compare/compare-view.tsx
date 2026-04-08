@@ -32,6 +32,7 @@ export function CompareView({ providers }: CompareViewProps) {
   const [prompt, setPrompt] = useState('');
   const [columns, setColumns] = useState<readonly ColumnState[]>(() => initialColumns(providers));
   const [isRunning, setIsRunning] = useState(false);
+  const [shareId, setShareId] = useState<string | null>(null);
   // Track in-flight aborts so a new Run can cancel the previous fan-out cleanly.
   const abortRef = useRef<AbortController | null>(null);
 
@@ -46,6 +47,7 @@ export function CompareView({ providers }: CompareViewProps) {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    setShareId(null);
     setIsRunning(true);
     setColumns((prev) =>
       prev.map((c) => ({
@@ -64,8 +66,21 @@ export function CompareView({ providers }: CompareViewProps) {
     // can't accidentally swap models on us.
     const snapshot = columns.map((c) => ({ providerId: c.providerId, modelId: c.modelId }));
 
+    type FinishedRun = {
+      providerId: ProviderId;
+      modelId: string;
+      output: string;
+      latencyMs: number;
+      inputTokens: number;
+      outputTokens: number;
+      costUsd: number;
+    };
+
+    const finished: FinishedRun[] = [];
+
     await Promise.all(
       snapshot.map(async ({ providerId, modelId }) => {
+        let accumulated = '';
         try {
           const meta = await runStream({
             prompt,
@@ -73,6 +88,7 @@ export function CompareView({ providers }: CompareViewProps) {
             modelId,
             signal: controller.signal,
             onText: (delta) => {
+              accumulated += delta;
               setColumns((prev) =>
                 prev.map((c) =>
                   c.providerId === providerId ? { ...c, output: c.output + delta } : c,
@@ -82,6 +98,15 @@ export function CompareView({ providers }: CompareViewProps) {
           });
           updateColumn(providerId, {
             status: 'done',
+            latencyMs: meta.latencyMs,
+            inputTokens: meta.inputTokens,
+            outputTokens: meta.outputTokens,
+            costUsd: meta.costUsd,
+          });
+          finished.push({
+            providerId,
+            modelId,
+            output: accumulated,
             latencyMs: meta.latencyMs,
             inputTokens: meta.inputTokens,
             outputTokens: meta.outputTokens,
@@ -98,6 +123,36 @@ export function CompareView({ providers }: CompareViewProps) {
     );
 
     setIsRunning(false);
+
+    // Persist + surface the share URL only when at least one column succeeded
+    // and the user didn't abort. Failures here are non-fatal — surface them
+    // inline rather than blocking the visible run.
+    if (!controller.signal.aborted && finished.length > 0) {
+      try {
+        const res = await fetch('/api/comparisons', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            results: finished.map((f) => ({
+              provider: f.providerId,
+              model: f.modelId,
+              output: f.output,
+              latency_ms: f.latencyMs,
+              input_tokens: f.inputTokens,
+              output_tokens: f.outputTokens,
+              cost_usd: f.costUsd,
+            })),
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { id: string };
+          setShareId(data.id);
+        }
+      } catch {
+        // Persistence is best-effort. The run is still visible on screen.
+      }
+    }
   }
 
   return (
@@ -110,6 +165,8 @@ export function CompareView({ providers }: CompareViewProps) {
       </header>
 
       <PromptInput value={prompt} onChange={setPrompt} onRun={run} isRunning={isRunning} />
+
+      {shareId && <ShareLink id={shareId} />}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {providers.map((provider) => {
@@ -126,6 +183,18 @@ export function CompareView({ providers }: CompareViewProps) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function ShareLink({ id }: { id: string }) {
+  const url = typeof window !== 'undefined' ? `${window.location.origin}/compare/${id}` : '';
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+      <span className="font-medium">Share:</span>
+      <a href={`/compare/${id}`} className="font-mono underline underline-offset-2">
+        {url || `/compare/${id}`}
+      </a>
     </div>
   );
 }
