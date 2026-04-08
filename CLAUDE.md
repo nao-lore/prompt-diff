@@ -83,18 +83,18 @@
 
 ## 技術スタック
 
-| 領域 | 技術 | 採用理由 |
-|---|---|---|
-| Framework | Next.js 15 (App Router) | Server Component とストリーミングの両立 |
-| 言語 | TypeScript (strict) | 型安全性 |
-| Styling | Tailwind CSS + shadcn/ui | 速度と品質の両立、カスタマイズ性 |
-| DB | Supabase (Postgres) | 履歴保存のみで十分、将来の認証追加が容易 |
-| LLM SDK | Vercel AI SDK (`ai` パッケージ) | プロバイダ抽象とストリーミングの標準化 |
-| バリデーション | zod | 環境変数・API レスポンス検証 |
-| テスト | Vitest | 高速、Next.js との相性良好 |
-| Lint/Format | ESLint + Prettier + Husky | 一貫性 |
-| Deploy | Vercel | Next.js 公式、ゼロ設定 |
-| パッケージ管理 | pnpm | 速度とディスク効率 |
+| 領域           | 技術                            | 採用理由                                 |
+| -------------- | ------------------------------- | ---------------------------------------- |
+| Framework      | Next.js 15 (App Router)         | Server Component とストリーミングの両立  |
+| 言語           | TypeScript (strict)             | 型安全性                                 |
+| Styling        | Tailwind CSS + shadcn/ui        | 速度と品質の両立、カスタマイズ性         |
+| DB             | Supabase (Postgres)             | 履歴保存のみで十分、将来の認証追加が容易 |
+| LLM SDK        | Vercel AI SDK (`ai` パッケージ) | プロバイダ抽象とストリーミングの標準化   |
+| バリデーション | zod                             | 環境変数・API レスポンス検証             |
+| テスト         | Vitest                          | 高速、Next.js との相性良好               |
+| Lint/Format    | ESLint + Prettier + Husky       | 一貫性                                   |
+| Deploy         | Vercel                          | Next.js 公式、ゼロ設定                   |
+| パッケージ管理 | pnpm                            | 速度とディスク効率                       |
 
 ---
 
@@ -238,15 +238,19 @@ create index results_comparison_id_idx on results(comparison_id);
 
 ```markdown
 ## What
+
 (変更内容を 1-3 行)
 
 ## Why
+
 (なぜ必要か)
 
 ## How
+
 (設計上の判断、トレードオフ)
 
 ## Test
+
 - [ ] `pnpm build` 通過
 - [ ] `pnpm test` 通過
 - [ ] 手動確認済み
@@ -259,6 +263,7 @@ create index results_comparison_id_idx on results(comparison_id);
 各 PR は独立してマージ可能で、main は常にデプロイ可能な状態を保つこと。
 
 ### PR #1: プロジェクト初期化
+
 - Next.js 15 + TypeScript strict + pnpm セットアップ
 - Tailwind + shadcn/ui 導入
 - ESLint + Prettier + Husky 設定
@@ -267,48 +272,57 @@ create index results_comparison_id_idx on results(comparison_id);
 - Vercel デプロイ確認(空ページで OK)
 
 ### PR #2: env 検証と Result 型
+
 - `lib/env.ts`(zod による環境変数検証)
 - `lib/result.ts`(`Result<T, E>` 型と `ok()` / `err()` ヘルパー)
 - ユニットテスト
 
 ### PR #3: Provider 抽象化と 3 プロバイダ実装
+
 - `lib/providers/types.ts`(`LLMProvider` インターフェース)
 - `anthropic.ts` / `openai.ts` / `google.ts`(Vercel AI SDK 経由)
 - `lib/pricing.ts`(モデル別料金表)
 - 各プロバイダのユニットテスト(SDK モック)
 
 ### PR #4: Supabase スキーマとクエリ層
+
 - `supabase/migrations/0001_initial.sql`
 - `lib/db/client.ts` / `schema.ts` / `queries.ts`
 - ローカル動作確認手順を README に追記
 
 ### PR #5: メイン画面の UI(モック動作)
+
 - `/compare/page.tsx`
 - `prompt-input.tsx` / `result-column.tsx` / `meta-info.tsx` / `model-selector.tsx`
 - まずはモックデータで 3 カラムレイアウトを完成
 - レスポンシブ対応(モバイルは縦並び)
 
 ### PR #6: ストリーミング API と統合
+
 - `/api/run/route.ts`(3 プロバイダ並列実行 + ストリーミング)
 - フロントとの結線
 - ローディング/エラー UI
 - メタ情報の実データ反映
 
 ### PR #7: 履歴保存と共有 URL
+
 - 実行完了時に Supabase に保存
 - `/compare/[id]/page.tsx`(共有ビュー、Server Component)
 
 ### PR #8: Markdown エクスポート
+
 - `copy-as-markdown-button.tsx`
 - フォーマット定義は `lib/utils.ts` の純粋関数に切り出してテスト
 
 ### PR #9: ランディングページと README 完成版
+
 - `/(marketing)/page.tsx`(What & Why、デモ GIF プレースホルダ)
 - README を「README 必須構成」に従って完成
 - ARCHITECTURE.md 作成
 - ADR 4 本を書き上げる
 
 ### PR #10: 仕上げ
+
 - アクセシビリティチェック(キーボード操作、aria-label)
 - メタタグ・OGP 設定
 - エラーバウンダリ
