@@ -67,6 +67,24 @@ See [`.env.example`](./.env.example).
 
 All variables are validated at startup with [zod](https://zod.dev) (see `src/lib/env.ts`, added in PR #2).
 
+## Database (Supabase)
+
+Run the migration against your Supabase project once:
+
+```bash
+# Option A: Supabase CLI (recommended)
+supabase link --project-ref <your-project-ref>
+supabase db push
+
+# Option B: Paste into the SQL editor
+cat supabase/migrations/0001_initial.sql
+# → Supabase Dashboard → SQL editor → New query → paste → Run
+```
+
+The schema is two tables (`comparisons`, `results`) with public read RLS so the
+share URL works without authentication. All writes go through the service role
+key on the server. See `src/lib/db/queries.ts` for the query layer.
+
 ## Project Status
 
 This project is being built in [10 PRs](./CLAUDE.md#pr-分割計画この順番で進める). PR #1 (this PR) sets up the toolchain only.
