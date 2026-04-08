@@ -16,17 +16,39 @@ export type ProviderId = 'anthropic' | 'openai' | 'google';
  * by `getModel`. Keeping providers metadata-only makes them trivially
  * testable without spinning up the SDK.
  */
-export interface LLMProvider {
+/**
+ * Serializable provider metadata. Safe to pass from a Server Component
+ * to a Client Component (no functions, no class instances).
+ */
+export interface ProviderInfo {
   readonly id: ProviderId;
   readonly displayName: string;
   readonly defaultModel: string;
   readonly availableModels: readonly string[];
+}
 
+/**
+ * Server-only provider: extends `ProviderInfo` with the `getModel`
+ * function that returns a Vercel AI SDK `LanguageModel`. Functions
+ * can't cross the RSC boundary, so never pass an `LLMProvider` to
+ * a Client Component — pass `toProviderInfo(provider)` instead.
+ */
+export interface LLMProvider extends ProviderInfo {
   /**
    * Returns a Vercel AI SDK `LanguageModel` for the given model id.
    * @throws if `modelId` is not in `availableModels`.
    */
   getModel(modelId: string): LanguageModel;
+}
+
+/** Strip the function-valued field so the result can be sent to a client component. */
+export function toProviderInfo(provider: LLMProvider): ProviderInfo {
+  return {
+    id: provider.id,
+    displayName: provider.displayName,
+    defaultModel: provider.defaultModel,
+    availableModels: provider.availableModels,
+  };
 }
 
 /**

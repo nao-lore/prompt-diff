@@ -1,7 +1,7 @@
 import { anthropicProvider } from './anthropic';
 import { googleProvider } from './google';
 import { openaiProvider } from './openai';
-import type { LLMProvider, ProviderId } from './types';
+import { toProviderInfo, type LLMProvider, type ProviderId, type ProviderInfo } from './types';
 
 /**
  * Registry of all supported providers, keyed by id.
@@ -23,4 +23,9 @@ export function getAllProviders(): readonly LLMProvider[] {
 
 export const PROVIDER_IDS = Object.keys(PROVIDERS) as readonly ProviderId[];
 
-export type { LLMProvider, ProviderId } from './types';
+/** Serializable view of every provider — safe to pass to Client Components. */
+export function getAllProviderInfos(): readonly ProviderInfo[] {
+  return getAllProviders().map(toProviderInfo);
+}
+
+export type { LLMProvider, ProviderId, ProviderInfo } from './types';
