@@ -4,8 +4,10 @@
 // handler that fans out three parallel /api/run requests.
 
 import { useRef, useState } from 'react';
+import { formatComparisonAsMarkdown, type MarkdownResult } from '@/lib/markdown';
 import { runStream } from '@/lib/run-client';
 import type { ProviderId, ProviderInfo } from '@/lib/providers/types';
+import { CopyAsMarkdownButton } from './copy-as-markdown-button';
 import { PromptInput } from './prompt-input';
 import { ResultColumn } from './result-column';
 import type { ColumnState } from './types';
@@ -33,6 +35,12 @@ export function CompareView({ providers }: CompareViewProps) {
   const [columns, setColumns] = useState<readonly ColumnState[]>(() => initialColumns(providers));
   const [isRunning, setIsRunning] = useState(false);
   const [shareId, setShareId] = useState<string | null>(null);
+  // Snapshot of the last finished run, used to build the Markdown export.
+  // Lives in state (not a ref) so the export button re-renders with content.
+  const [lastRun, setLastRun] = useState<{
+    prompt: string;
+    results: readonly MarkdownResult[];
+  } | null>(null);
   // Track in-flight aborts so a new Run can cancel the previous fan-out cleanly.
   const abortRef = useRef<AbortController | null>(null);
 
@@ -48,6 +56,7 @@ export function CompareView({ providers }: CompareViewProps) {
     abortRef.current = controller;
 
     setShareId(null);
+    setLastRun(null);
     setIsRunning(true);
     setColumns((prev) =>
       prev.map((c) => ({
@@ -124,6 +133,21 @@ export function CompareView({ providers }: CompareViewProps) {
 
     setIsRunning(false);
 
+    if (!controller.signal.aborted && finished.length > 0) {
+      setLastRun({
+        prompt,
+        results: finished.map((f) => ({
+          provider: f.providerId,
+          model: f.modelId,
+          output: f.output,
+          latencyMs: f.latencyMs,
+          inputTokens: f.inputTokens,
+          outputTokens: f.outputTokens,
+          costUsd: f.costUsd,
+        })),
+      });
+    }
+
     // Persist + surface the share URL only when at least one column succeeded
     // and the user didn't abort. Failures here are non-fatal — surface them
     // inline rather than blocking the visible run.
@@ -166,7 +190,16 @@ export function CompareView({ providers }: CompareViewProps) {
 
       <PromptInput value={prompt} onChange={setPrompt} onRun={run} isRunning={isRunning} />
 
-      {shareId && <ShareLink id={shareId} />}
+      {(shareId || lastRun) && (
+        <div className="flex flex-wrap items-center gap-3">
+          {shareId && <ShareLink id={shareId} />}
+          {lastRun && (
+            <CopyAsMarkdownButton
+              markdown={formatComparisonAsMarkdown(lastRun.prompt, lastRun.results)}
+            />
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {providers.map((provider) => {
