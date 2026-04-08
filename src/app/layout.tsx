@@ -12,13 +12,31 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const SITE_NAME = 'Prompt Diff';
+const SITE_DESCRIPTION =
+  'Send the same prompt to Claude, GPT, and Gemini at once. Compare output, latency, tokens, and cost in a 3-column view.';
+
 export const metadata: Metadata = {
   title: {
-    default: 'Prompt Diff — compare LLM outputs side by side',
-    template: '%s · Prompt Diff',
+    default: `${SITE_NAME} — compare LLM outputs side by side`,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    'Send the same prompt to Claude, GPT, and Gemini at once. Compare output, latency, tokens, and cost in a 3-column view.',
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  authors: [{ name: 'nao' }],
+  keywords: ['LLM', 'Claude', 'GPT', 'Gemini', 'prompt engineering', 'model comparison'],
+  openGraph: {
+    type: 'website',
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — compare LLM outputs side by side`,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${SITE_NAME} — compare LLM outputs side by side`,
+    description: SITE_DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

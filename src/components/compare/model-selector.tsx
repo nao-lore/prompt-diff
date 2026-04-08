@@ -17,6 +17,7 @@ export function ModelSelector({ provider, modelId, onChange, disabled }: ModelSe
     <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
       <span className="font-semibold">{provider.displayName}</span>
       <select
+        aria-label={`${provider.displayName} model`}
         value={modelId}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}

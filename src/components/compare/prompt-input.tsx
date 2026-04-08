@@ -22,6 +22,7 @@ export function PromptInput({ value, onChange, onRun, isRunning }: PromptInputPr
       </label>
       <Textarea
         id="prompt"
+        aria-label="Prompt to send to all three models"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Ask the same question to all three models…"
