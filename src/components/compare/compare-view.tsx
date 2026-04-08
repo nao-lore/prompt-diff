@@ -1,9 +1,10 @@
 'use client';
 
-// 'use client': holds the per-column state, prompt input, and the (mock,
-// for now) Run handler. Real streaming is wired up in PR #6.
+// 'use client': holds the per-column state, prompt input, and the Run
+// handler that fans out three parallel /api/run requests.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { runStream } from '@/lib/run-client';
 import type { ProviderId, ProviderInfo } from '@/lib/providers/types';
 import { PromptInput } from './prompt-input';
 import { ResultColumn } from './result-column';
@@ -12,12 +13,6 @@ import type { ColumnState } from './types';
 interface CompareViewProps {
   providers: readonly ProviderInfo[];
 }
-
-const MOCK_OUTPUT: Record<ProviderId, string> = {
-  anthropic: 'Mock Claude output. Real streaming is wired up in PR #6.',
-  openai: 'Mock GPT output. Real streaming is wired up in PR #6.',
-  google: 'Mock Gemini output. Real streaming is wired up in PR #6.',
-};
 
 function initialColumns(providers: readonly ProviderInfo[]): readonly ColumnState[] {
   return providers.map((p) => ({
@@ -37,13 +32,20 @@ export function CompareView({ providers }: CompareViewProps) {
   const [prompt, setPrompt] = useState('');
   const [columns, setColumns] = useState<readonly ColumnState[]>(() => initialColumns(providers));
   const [isRunning, setIsRunning] = useState(false);
+  // Track in-flight aborts so a new Run can cancel the previous fan-out cleanly.
+  const abortRef = useRef<AbortController | null>(null);
 
   function updateColumn(providerId: ProviderId, patch: Partial<ColumnState>) {
     setColumns((prev) => prev.map((c) => (c.providerId === providerId ? { ...c, ...patch } : c)));
   }
 
-  // PR #6 will replace this with real streaming via /api/run.
-  function runMock() {
+  async function run() {
+    if (prompt.trim().length === 0 || isRunning) return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsRunning(true);
     setColumns((prev) =>
       prev.map((c) => ({
@@ -58,21 +60,44 @@ export function CompareView({ providers }: CompareViewProps) {
       })),
     );
 
-    const start = Date.now();
-    setTimeout(() => {
-      setColumns((prev) =>
-        prev.map((c) => ({
-          ...c,
-          status: 'done',
-          output: MOCK_OUTPUT[c.providerId],
-          latencyMs: Date.now() - start,
-          inputTokens: 12,
-          outputTokens: 24,
-          costUsd: 0.000123,
-        })),
-      );
-      setIsRunning(false);
-    }, 600);
+    // Snapshot the current model selection so a re-render mid-flight
+    // can't accidentally swap models on us.
+    const snapshot = columns.map((c) => ({ providerId: c.providerId, modelId: c.modelId }));
+
+    await Promise.all(
+      snapshot.map(async ({ providerId, modelId }) => {
+        try {
+          const meta = await runStream({
+            prompt,
+            provider: providerId,
+            modelId,
+            signal: controller.signal,
+            onText: (delta) => {
+              setColumns((prev) =>
+                prev.map((c) =>
+                  c.providerId === providerId ? { ...c, output: c.output + delta } : c,
+                ),
+              );
+            },
+          });
+          updateColumn(providerId, {
+            status: 'done',
+            latencyMs: meta.latencyMs,
+            inputTokens: meta.inputTokens,
+            outputTokens: meta.outputTokens,
+            costUsd: meta.costUsd,
+          });
+        } catch (e) {
+          if (controller.signal.aborted) return;
+          updateColumn(providerId, {
+            status: 'error',
+            errorMessage: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }),
+    );
+
+    setIsRunning(false);
   }
 
   return (
@@ -84,7 +109,7 @@ export function CompareView({ providers }: CompareViewProps) {
         </p>
       </header>
 
-      <PromptInput value={prompt} onChange={setPrompt} onRun={runMock} isRunning={isRunning} />
+      <PromptInput value={prompt} onChange={setPrompt} onRun={run} isRunning={isRunning} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {providers.map((provider) => {
